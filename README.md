@@ -5,7 +5,8 @@ A full‑stack **Amazon‑inspired ecommerce application** built as a technical 
 The application includes authentication, product browsing, cart management, checkout, order tracking, and reviews.
 
 ---
-#TEST CREDENTIALS
+## TEST CREDENTIALS
+
 test@test.com
 Test@123
 
