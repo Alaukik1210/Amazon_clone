@@ -18,17 +18,15 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
-import { OtpBox } from "@/components/auth/OtpBox";
-import { OtpTimer } from "@/components/auth/OtpTimer";
 import Link from "next/link";
 
-// ─── Step 1: Registration Form ─────────────────────────────────────────────────
-
 interface RegisterFormProps {
-  onSuccess: (email: string) => void;
+  onSuccess: () => void;
 }
 
 function RegisterForm({ onSuccess }: RegisterFormProps) {
+  const { setUser } = useAuthStore();
+  const qc = useQueryClient();
   const [apiError, setApiError] = useState("");
 
   const {
@@ -43,14 +41,18 @@ function RegisterForm({ onSuccess }: RegisterFormProps) {
   const onSubmit = async (data: RegisterInput) => {
     setApiError("");
     try {
-      await authService.register({
-        name:     data.name,
-        email:    data.email,
+      const res = await authService.register({
+        name: data.name,
+        email: data.email,
         password: data.password,
-        phone:    data.phone || undefined,
+        phone: data.phone || undefined,
       });
-      toast.success("Account created! Verify OTP to continue.");
-      onSuccess(data.email);
+
+      const user = res.data.data;
+      setUser(user);
+      qc.setQueryData(QUERY_KEYS.ME, user);
+      toast.success(`Welcome, ${user.name?.split(" ")[0] ?? "there"}!`);
+      onSuccess();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       setApiError(
@@ -128,83 +130,6 @@ function RegisterForm({ onSuccess }: RegisterFormProps) {
   );
 }
 
-// ─── Step 2: Email OTP Verification ───────────────────────────────────────────
-
-interface VerifyOtpStepProps {
-  email: string;
-  onSuccess: () => void;
-  onBack: () => void;
-}
-
-function VerifyOtpStep({ email, onSuccess, onBack }: VerifyOtpStepProps) {
-  const { setUser } = useAuthStore();
-  const qc = useQueryClient();
-  const [otp, setOtp] = useState("");
-  const [apiError, setApiError] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-
-  const verifyOtp = async () => {
-    setApiError("");
-    if (otp.length < 6) { setApiError("Please enter the complete 6-digit OTP"); return; }
-    setIsVerifying(true);
-    try {
-      const res = await authService.verifyOtp({ email, otp, purpose: "REGISTER" });
-      const user = res.data.data;
-      setUser(user);
-      qc.setQueryData(QUERY_KEYS.ME, user);
-      toast.success("OTP verified! Welcome to Amazon.");
-      onSuccess();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Verification failed";
-      setOtp("");
-      setApiError(
-        msg.toLowerCase().includes("expired")
-          ? "OTP has expired. Please request a new one."
-          : "Invalid OTP. Check your email and try again."
-      );
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const resendOtp = async () => {
-    await authService.sendOtp({ email, purpose: "REGISTER" });
-    toast.success("A new OTP has been sent");
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-[var(--amazon-text-primary)]">Verify OTP</h2>
-        <p className="text-sm text-[var(--amazon-text-muted)] mt-1">
-          Enter the 6-digit OTP for <span className="font-semibold text-[var(--amazon-text-primary)]">{email}</span>
-        </p>
-      </div>
-
-      {apiError && <Alert variant="error" message={apiError} />}
-
-      <div className="space-y-2">
-        <label className="form-label text-center block">Enter OTP</label>
-        <OtpBox value={otp} onChange={setOtp} />
-      </div>
-
-      <Button fullWidth loading={isVerifying} onClick={verifyOtp} className="btn-amazon !rounded-lg">
-        Verify OTP
-      </Button>
-
-      <OtpTimer onResend={resendOtp} />
-
-      <button type="button" className="amazon-link text-sm w-full text-center block" onClick={onBack}>
-        ← Back to registration
-      </button>
-    </div>
-  );
-}
-
-// ─── Register Page ─────────────────────────────────────────────────────────────
-
-type Step = "register" | "verify";
-
 export default function RegisterPage() {
   return (
     <Suspense fallback={<div className="min-h-[320px]" />}>
@@ -214,51 +139,21 @@ export default function RegisterPage() {
 }
 
 function RegisterPageContent() {
-  const [step, setStep] = useState<Step>("register");
-  const [email, setEmail] = useState("");
-  const [stepError, setStepError] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? ROUTES.HOME;
 
-  const handleRegistered = async (registeredEmail: string) => {
-    setStepError("");
-    setEmail(registeredEmail);
-    try {
-      await authService.sendOtp({ email: registeredEmail, purpose: "REGISTER" });
-      toast.success("Verification OTP sent");
-      setStep("verify");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send OTP";
-      setStepError(msg);
-      toast.error(msg);
-    }
-  };
-
-  const handleVerified = () => router.push(redirect);
-
   return (
     <>
-      {step === "register" ? (
-        <>
-          <h1 className="text-2xl font-semibold text-[var(--amazon-text-primary)] mb-5">Create account</h1>
-          {stepError && <Alert variant="error" message={stepError} />}
-          <RegisterForm onSuccess={handleRegistered} />
-          <div className="amazon-divider my-5">already have an account?</div>
-          <Link
-            href={`${ROUTES.LOGIN}${redirect !== ROUTES.HOME ? `?redirect=${redirect}` : ""}`}
-            className="block text-center"
-          >
-            <Button variant="outline" fullWidth>Sign in</Button>
-          </Link>
-        </>
-      ) : (
-        <VerifyOtpStep
-          email={email}
-          onSuccess={handleVerified}
-          onBack={() => setStep("register")}
-        />
-      )}
+      <h1 className="text-2xl font-semibold text-[var(--amazon-text-primary)] mb-5">Create account</h1>
+      <RegisterForm onSuccess={() => router.push(redirect)} />
+      <div className="amazon-divider my-5">already have an account?</div>
+      <Link
+        href={`${ROUTES.LOGIN}${redirect !== ROUTES.HOME ? `?redirect=${redirect}` : ""}`}
+        className="block text-center"
+      >
+        <Button variant="outline" fullWidth>Sign in</Button>
+      </Link>
     </>
   );
 }
