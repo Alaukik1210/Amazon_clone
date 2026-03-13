@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 const DEFAULT_BACKEND_ORIGIN = "https://amazon-clone-1-fcwc.onrender.com";
+const isProduction = process.env.NODE_ENV === "production";
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -15,6 +16,14 @@ const HOP_BY_HOP_HEADERS = new Set([
   "content-length",
 ]);
 
+const FORWARDED_REQUEST_HEADERS = [
+  "accept",
+  "content-type",
+  "authorization",
+  "cookie",
+  "user-agent",
+] as const;
+
 function getBackendOrigin(): string {
   const backendUrl = process.env.BACKEND_URL?.trim();
   const publicApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -27,13 +36,24 @@ function getBackendOrigin(): string {
   return originCandidate.replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
 }
 
-function filterRequestHeaders(headers: Headers): Headers {
+function buildUpstreamRequestHeaders(headers: Headers): Headers {
+  const out = new Headers();
+
+  for (const header of FORWARDED_REQUEST_HEADERS) {
+    const value = headers.get(header);
+    if (value) out.set(header, value);
+  }
+
+  return out;
+}
+
+function buildClientResponseHeaders(headers: Headers): Headers {
   const out = new Headers();
 
   headers.forEach((value, key) => {
     const lower = key.toLowerCase();
     if (HOP_BY_HOP_HEADERS.has(lower)) return;
-    out.set(key, value);
+    out.append(key, value);
   });
 
   return out;
@@ -52,7 +72,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
 
     const init: RequestInit = {
       method: request.method,
-      headers: filterRequestHeaders(request.headers),
+      headers: buildUpstreamRequestHeaders(request.headers),
       redirect: "manual",
       cache: "no-store",
     };
@@ -66,16 +86,22 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
-      headers: upstream.headers,
+      headers: buildClientResponseHeaders(upstream.headers),
     });
-  } catch {
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown proxy error";
     return Response.json(
-      { success: false, message: "API proxy failed" },
+      {
+        success: false,
+        message: "API proxy failed",
+        ...(isProduction ? {} : { detail }),
+      },
       { status: 502 }
     );
   }
 }
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, context: RouteContext) {
