@@ -5,12 +5,15 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon",
+    "prisma:generate": "prisma generate",
+    "prebuild": "npm run prisma:generate",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "db:check": "ts-node --transpile-only scripts/test-db.ts",
     "db:seed": "ts-node --transpile-only scripts/seed.ts",
     "start": "node dist/server.js",
-    "test": "node --require ts-node/register/transpile-only --test \"tests/**/*.test.ts\""
+    "test": "node --require ts-node/register/transpile-only --test \"tests/**/*.test.ts\"",
+    "postinstall": "npm run prisma:generate"
   },
   "keywords": [],
   "author": "",
