@@ -2,8 +2,9 @@ import axios from "axios";
 
 const isBrowser = typeof window !== "undefined";
 const browserBaseUrl = "/api/v1";
+const backendUrl = process.env.BACKEND_URL?.trim() ?? "";
 const backendOrigin =
-  process.env.BACKEND_URL?.trim() ||
+  (backendUrl.startsWith("http") ? backendUrl : "") ||
   "https://amazon-clone-1-fcwc.onrender.com";
 const serverBaseUrl =
   process.env.NEXT_PUBLIC_API_URL?.startsWith("http")

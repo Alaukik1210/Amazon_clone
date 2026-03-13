@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Logo */}
       <Link href="/" className="mb-6">
         <Image
-          src="/logo_dark.jpg"
+          src="/dark_logo.webp"
           alt="Amazon logo"
           width={130}
           height={40}

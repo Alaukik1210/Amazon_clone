@@ -27,9 +27,10 @@ const FORWARDED_REQUEST_HEADERS = [
 function getBackendOrigin(): string {
   const backendUrl = process.env.BACKEND_URL?.trim();
   const publicApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const safeBackendUrl = backendUrl?.startsWith("http") ? backendUrl : "";
 
   const originCandidate =
-    backendUrl ||
+    safeBackendUrl ||
     (publicApiUrl?.startsWith("http") ? publicApiUrl : "") ||
     DEFAULT_BACKEND_ORIGIN;
 
