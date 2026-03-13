@@ -14,6 +14,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
   "host",
   "content-length",
+  "content-encoding"
 ]);
 
 const FORWARDED_REQUEST_HEADERS = [
