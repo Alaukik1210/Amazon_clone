@@ -118,7 +118,7 @@ function OtpLoginForm({ onSuccess }: { onSuccess: () => void }) {
       await authService.sendOtp({ email: data.email, purpose: "LOGIN" });
       setEmail(data.email);
       setStep("verify");
-      toast.success("OTP sent to your email");
+      toast.success("OTP sent successfully");
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : "Failed to send OTP");
     }
@@ -173,7 +173,7 @@ function OtpLoginForm({ onSuccess }: { onSuccess: () => void }) {
       {apiError && <Alert variant="error" message={apiError} />}
       <Alert
         variant="info"
-        message={`We sent a 6-digit OTP to ${email}. Check your inbox (and spam folder).`}
+        message={`Enter the 6-digit OTP for ${email}.`}
       />
       <div className="space-y-3">
         <label className="form-label text-center block">Enter OTP</label>

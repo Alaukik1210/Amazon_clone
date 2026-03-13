@@ -6,9 +6,11 @@ export const metadata: Metadata = {
   title: { default: "Amazon.in: Online Shopping India", template: "%s | Amazon.in" },
   description: "Production-level Amazon clone built with Next.js and TypeScript",
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/dark_logo.webp",
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
 };
 

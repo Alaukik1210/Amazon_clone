@@ -49,7 +49,7 @@ function RegisterForm({ onSuccess }: RegisterFormProps) {
         password: data.password,
         phone:    data.phone || undefined,
       });
-      toast.success("Account created! Verify your email to continue.");
+      toast.success("Account created! Verify OTP to continue.");
       onSuccess(data.email);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
@@ -152,7 +152,7 @@ function VerifyOtpStep({ email, onSuccess, onBack }: VerifyOtpStepProps) {
       const user = res.data.data;
       setUser(user);
       qc.setQueryData(QUERY_KEYS.ME, user);
-      toast.success("Email verified! Welcome to Amazon.");
+      toast.success("OTP verified! Welcome to Amazon.");
       onSuccess();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification failed";
@@ -169,15 +169,15 @@ function VerifyOtpStep({ email, onSuccess, onBack }: VerifyOtpStepProps) {
 
   const resendOtp = async () => {
     await authService.sendOtp({ email, purpose: "REGISTER" });
-    toast.success("A new OTP has been sent to your email");
+    toast.success("A new OTP has been sent");
   };
 
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-[var(--amazon-text-primary)]">Verify your email</h2>
+        <h2 className="text-xl font-semibold text-[var(--amazon-text-primary)]">Verify OTP</h2>
         <p className="text-sm text-[var(--amazon-text-muted)] mt-1">
-          We sent a 6-digit OTP to <span className="font-semibold text-[var(--amazon-text-primary)]">{email}</span>
+          Enter the 6-digit OTP for <span className="font-semibold text-[var(--amazon-text-primary)]">{email}</span>
         </p>
       </div>
 
@@ -189,7 +189,7 @@ function VerifyOtpStep({ email, onSuccess, onBack }: VerifyOtpStepProps) {
       </div>
 
       <Button fullWidth loading={isVerifying} onClick={verifyOtp} className="btn-amazon !rounded-lg">
-        Verify email address
+        Verify OTP
       </Button>
 
       <OtpTimer onResend={resendOtp} />
@@ -226,7 +226,7 @@ function RegisterPageContent() {
     setEmail(registeredEmail);
     try {
       await authService.sendOtp({ email: registeredEmail, purpose: "REGISTER" });
-      toast.success("Verification OTP sent to your email");
+      toast.success("Verification OTP sent");
       setStep("verify");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to send OTP";

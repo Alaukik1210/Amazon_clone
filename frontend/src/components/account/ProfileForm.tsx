@@ -98,8 +98,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
       {!user.isEmailVerified && (
         <Alert
           variant="warning"
-          title="Email not verified"
-          message="Verify your email to place orders and access all features."
+          title="Verification pending"
+          message="Complete OTP verification to access all features."
         />
       )}
 

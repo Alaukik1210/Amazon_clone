@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { QUERY_KEYS } from "@/lib/constants";
 const INTERVAL = 5500;
 
 export function HeroBanner() {
+  const router = useRouter();
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -80,7 +82,12 @@ export function HeroBanner() {
         aria-live="polite"
       >
         {slides.map((slide, idx) => (
-          <div key={slide.id} className="relative min-w-full h-full" aria-hidden={idx !== active}>
+          <div
+            key={slide.id}
+            className="relative min-w-full h-full cursor-pointer"
+            aria-hidden={idx !== active}
+            onClick={() => router.push(slide.href)}
+          >
             {/* Background image */}
             <Image
               src={slide.img}
