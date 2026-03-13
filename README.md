@@ -10,6 +10,18 @@ The application includes authentication, product browsing, cart management, chec
 test@test.com
 Test@123
 
+---
+
+# ⚠️ Known Issue (Deployment)
+
+During deployment on **Render**, some API responses may take **~40–50 seconds** for the first request.
+
+This occurs due to **Render free tier cold start behavior**, where the server spins down when idle and takes time to wake up.
+
+This delay is **not related to application performance or backend logic**, and once the server is active, subsequent requests respond normally.
+
+---
+
 # 🚀 Tech Stack
 
 ## Frontend
@@ -299,16 +311,6 @@ Operational endpoints:
 /health
 /ready
 ```
-
----
-
-# ⚠️ Known Issue (Deployment)
-
-During deployment on **Render**, some API responses may take **~40–50 seconds** for the first request.
-
-This occurs due to **Render free tier cold start behavior**, where the server spins down when idle and takes time to wake up.
-
-This delay is **not related to application performance or backend logic**, and once the server is active, subsequent requests respond normally.
 
 
 ---
