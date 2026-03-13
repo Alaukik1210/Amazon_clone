@@ -1,13 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-white flex flex-col items-center pt-8 pb-16 px-4">
       {/* Logo */}
       <Link href="/" className="mb-6">
-        <span className="text-[#0f1111] font-extrabold text-3xl tracking-tight">
-          amazon<span className="text-[#ff9900]">.</span>in
-        </span>
+        <Image
+          src="/logo_dark.jpg"
+          alt="Amazon logo"
+          width={130}
+          height={40}
+          priority
+          className="h-auto w-[130px]"
+        />
       </Link>
 
       {/* Card */}

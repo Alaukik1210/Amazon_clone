@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  ShoppingCart, MapPin, Menu, X, ChevronDown, User, Search,
+  ShoppingCart, MapPin, Menu, ChevronDown, User, Search,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -185,27 +186,19 @@ export function Navbar() {
       <div className="bg-[#131921]">
         <div className="flex items-center gap-2 px-3 h-[60px] max-w-[1500px] mx-auto">
 
-          {/* Mobile: hamburger */}
-          <button
-            className="md:hidden text-white p-1 cursor-pointer hover:outline hover:outline-1 hover:outline-white rounded"
-            onClick={() => setMobileOpen((o) => !o)}
-            aria-label="Menu"
-          >
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-
           {/* Logo */}
           <Link
             href={ROUTES.HOME}
-            className="shrink-0 flex flex-col items-center hover:outline hover:outline-1 hover:outline-white rounded px-1 pt-2 pb-1"
+            className="shrink-0 hover:outline hover:outline-1 hover:outline-white rounded px-1 py-1"
           >
-            <span className="text-white font-bold text-[22px] leading-none tracking-tight">
-              amazon
-            </span>
-            <span className="text-white text-[10px] leading-none font-semibold self-end -mt-0.5">
-              .in
-              <span className="text-[#ff9900]">›</span>
-            </span>
+            <Image
+              src="/logo.png"
+              alt="Amazon logo"
+              width={120}
+              height={36}
+              priority
+              className="h-auto w-[112px] sm:w-[120px]"
+            />
           </Link>
 
           {/* Deliver to — desktop only */}
@@ -293,36 +286,35 @@ export function Navbar() {
             <span className="text-white font-bold text-[13px]">&amp; Orders</span>
           </Link>
 
-          {/* Mobile: sign in icon */}
-          {!user && (
-            <Link
-              href={ROUTES.LOGIN}
-              className="md:hidden text-white flex items-center gap-0.5 hover:outline hover:outline-1 hover:outline-white rounded px-1 py-1 text-[13px] font-semibold"
-            >
-              Sign in <ChevronDown size={12} />
-            </Link>
-          )}
-          {user && (
-            <button
-              className="md:hidden text-white hover:outline hover:outline-1 hover:outline-white rounded p-1 cursor-pointer"
-              aria-label="Account"
-              onClick={() => setMobileOpen((o) => !o)}
-            >
-              <User size={22} />
-            </button>
-          )}
+          {/* Mobile: account control */}
+          <button
+            className="md:hidden ml-auto text-white flex items-center gap-1.5 hover:outline hover:outline-1 hover:outline-white rounded px-2 py-1 cursor-pointer"
+            aria-label="Account"
+            onClick={() => {
+              if (!user) {
+                router.push(ROUTES.LOGIN);
+                return;
+              }
+              setMobileOpen((o) => !o);
+            }}
+          >
+            <span className="text-[15px] font-bold leading-none max-w-[96px] truncate">
+              {firstName ?? "Sign in"}
+            </span>
+            <User size={20} className="shrink-0" />
+          </button>
 
           {/* Cart */}
           <Link
             href={ROUTES.CART}
-            className="relative flex items-end gap-0.5 hover:outline hover:outline-1 hover:outline-white rounded px-2 py-1 cursor-pointer"
+            className="relative flex items-end gap-0.5 hover:outline hover:outline-1 hover:outline-white rounded px-1.5 py-1 cursor-pointer"
             aria-label="Cart"
           >
             <span className="relative">
-              <ShoppingCart size={30} className="text-white" />
+              <ShoppingCart size={27} className="text-white" />
               {/* Badge */}
               <span className={cn(
-                "absolute -top-1.5 left-[14px] min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-extrabold px-0.5",
+                "absolute -top-1.5 left-[12px] min-w-[17px] h-[17px] rounded-full flex items-center justify-center text-[10px] font-extrabold px-0.5",
                 cartCount > 0 ? "bg-[#f08804] text-[#0f1111]" : "bg-[#f08804] text-[#0f1111]"
               )}>
                 {cartCount > 99 ? "99+" : cartCount}
