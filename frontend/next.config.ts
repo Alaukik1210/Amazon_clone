@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const DEFAULT_BACKEND_ORIGIN = "https://amazon-clone-1-fcwc.onrender.com";
+const publicApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim() ?? "";
 const rawBackendUrl =
-  process.env.BACKEND_URL ??
-  (process.env.NEXT_PUBLIC_API_URL?.startsWith("http") ? process.env.NEXT_PUBLIC_API_URL : "") ??
+  process.env.BACKEND_URL?.trim() ||
+  (publicApiUrl.startsWith("http") ? publicApiUrl : "") ||
   DEFAULT_BACKEND_ORIGIN;
 const backendOrigin = rawBackendUrl
   .replace(/\/api\/v1\/?$/, "")
