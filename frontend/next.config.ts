@@ -1,7 +1,25 @@
 import type { NextConfig } from "next";
 
+const rawBackendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+const backendOrigin = rawBackendUrl
+  .replace(/\/api\/v1\/?$/, "")
+  .replace(/\/$/, "");
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  async rewrites() {
+    // Proxy API via same-origin route to avoid third-party cookie issues in browsers.
+    if (!backendOrigin || backendOrigin.startsWith("/")) {
+      return [];
+    }
+
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${backendOrigin}/api/v1/:path*`,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "picsum.photos" },

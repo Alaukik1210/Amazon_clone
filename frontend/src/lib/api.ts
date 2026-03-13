@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const isBrowser = typeof window !== "undefined";
+const browserBaseUrl = "/api/v1";
+const serverBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: isBrowser ? browserBaseUrl : serverBaseUrl,
   withCredentials: true, // send HttpOnly cookies on every request
   headers: { "Content-Type": "application/json" },
 });
@@ -12,7 +16,9 @@ api.interceptors.response.use(
   (error) => {
     const message =
       error.response?.data?.message ?? error.message ?? "Something went wrong";
-    return Promise.reject(new Error(message));
+    const normalized = new Error(message) as Error & { status?: number };
+    normalized.status = error.response?.status;
+    return Promise.reject(normalized);
   }
 );
 
