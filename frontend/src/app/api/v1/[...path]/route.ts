@@ -55,8 +55,23 @@ function buildClientResponseHeaders(headers: Headers): Headers {
   headers.forEach((value, key) => {
     const lower = key.toLowerCase();
     if (HOP_BY_HOP_HEADERS.has(lower)) return;
+    
+    // Skip Set-Cookie here because forEach corrupts multiple cookies by joining them with commas
+    if (lower === "set-cookie") return; 
+    
     out.append(key, value);
   });
+
+  // Safely grab the un-joined cookies as an array
+  if (headers.getSetCookie) {
+    const setCookies = headers.getSetCookie();
+    for (const c of setCookies) {
+      out.append("set-cookie", c);
+    }
+  } else if (headers.has("set-cookie")) {
+    const raw = headers.get("set-cookie");
+    if (raw) out.append("set-cookie", raw);
+  }
 
   return out;
 }
