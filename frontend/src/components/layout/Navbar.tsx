@@ -332,9 +332,9 @@ export function Navbar() {
       </div>
 
       {/* ══ MOBILE: Shop By row ════════════════════════════════════════ */}
-      <div className="md:hidden bg-[#232f3e] text-white px-3 py-1.5 flex items-center gap-4 text-sm overflow-x-auto scrollbar-none">
+      <div className="md:hidden bg-[#232f3e] text-white px-3 py-1.5 flex items-center gap-3 text-sm overflow-x-auto whitespace-nowrap scrollbar-none">
         <span className="text-[#ccc] text-xs shrink-0">Shop By</span>
-        {["Category", "Deals", "Sell"].map((lbl) => (
+        {["Category", "Deals"].map((lbl) => (
           <Link key={lbl} href="/products" className="font-bold text-sm shrink-0 hover:text-[#ff9900]">
             {lbl}
           </Link>
