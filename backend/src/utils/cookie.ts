@@ -2,6 +2,7 @@ import { Response } from "express";
 import { env } from "../config/env";
 
 const isProduction = env.nodeEnv === "production";
+const sameSite = isProduction ? "none" : "lax";
 
 // Cookie name used across the app
 export const TOKEN_COOKIE = "token";
@@ -11,8 +12,10 @@ export function setTokenCookie(res: Response, token: string): void {
   res.cookie(TOKEN_COOKIE, token, {
     httpOnly: true,              // JS cannot read this — XSS protection
     secure: isProduction,        // HTTPS only in production
-    sameSite: "lax",            // Safer default across subdomains / separate frontend domains
+    // Cross-site frontend (Vercel) -> backend (Render) requires SameSite=None + Secure in production.
+    sameSite,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms (matches JWT_EXPIRES_IN)
+    path: "/",
   });
 }
 
@@ -21,6 +24,7 @@ export function clearTokenCookie(res: Response): void {
   res.clearCookie(TOKEN_COOKIE, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "lax",
+    sameSite,
+    path: "/",
   });
 }
