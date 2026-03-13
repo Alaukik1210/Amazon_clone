@@ -1,0 +1,122 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.placeOrder = placeOrder;
+exports.verifyPayment = verifyPayment;
+exports.getMyOrders = getMyOrders;
+exports.getOrderById = getOrderById;
+exports.downloadOrderInvoice = downloadOrderInvoice;
+exports.cancelOrder = cancelOrder;
+exports.updateOrderStatus = updateOrderStatus;
+exports.getAllOrders = getAllOrders;
+const orderService = __importStar(require("./order.service"));
+async function placeOrder(req, res, next) {
+    try {
+        const { addressId, paymentMode } = req.body;
+        const result = await orderService.placeOrder(req.user.id, addressId, paymentMode);
+        res.status(201).json({ success: true, data: result });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function verifyPayment(req, res, next) {
+    try {
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+        const order = await orderService.verifyPayment(String(req.params.id), req.user.id, razorpayOrderId, razorpayPaymentId, razorpaySignature);
+        res.status(200).json({ success: true, data: order });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function getMyOrders(req, res, next) {
+    try {
+        const result = await orderService.getMyOrders(req.user.id, res.locals.query);
+        res.status(200).json({ success: true, data: result });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function getOrderById(req, res, next) {
+    try {
+        const isAdmin = req.user.role === "ADMIN";
+        const order = await orderService.getOrderById(String(req.params.id), req.user.id, isAdmin);
+        res.status(200).json({ success: true, data: order });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function downloadOrderInvoice(req, res, next) {
+    try {
+        const isAdmin = req.user.role === "ADMIN";
+        const invoice = await orderService.generateOrderInvoice(String(req.params.id), req.user.id, isAdmin);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${invoice.fileName}"`);
+        res.status(200).send(invoice.buffer);
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function cancelOrder(req, res, next) {
+    try {
+        const order = await orderService.cancelOrder(String(req.params.id), req.user.id);
+        res.status(200).json({ success: true, data: order });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function updateOrderStatus(req, res, next) {
+    try {
+        const order = await orderService.updateOrderStatus(String(req.params.id), req.body.status);
+        res.status(200).json({ success: true, data: order });
+    }
+    catch (err) {
+        next(err);
+    }
+}
+async function getAllOrders(req, res, next) {
+    try {
+        const result = await orderService.getAllOrders(res.locals.query);
+        res.status(200).json({ success: true, data: result });
+    }
+    catch (err) {
+        next(err);
+    }
+}
