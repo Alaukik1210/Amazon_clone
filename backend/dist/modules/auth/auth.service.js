@@ -79,10 +79,11 @@ async function sendOtp(data) {
         }
     }
     else {
-        // LOGIN — user must exist
+        // LOGIN — do not reveal whether account exists (prevents user enumeration)
         const user = await db_1.default.user.findUnique({ where: { email } });
-        if (!user)
-            throw new AppError_1.AppError("No account found with this email", 404);
+        if (!user) {
+            return;
+        }
     }
     // Remove any previously sent OTPs for this email + purpose
     await db_1.default.otpVerification.deleteMany({ where: { email, purpose } });

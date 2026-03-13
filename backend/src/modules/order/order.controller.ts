@@ -13,22 +13,6 @@ export async function placeOrder(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function verifyPayment(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-    const order = await orderService.verifyPayment(
-      String(req.params.id),
-      req.user!.id,
-      razorpayOrderId,
-      razorpayPaymentId,
-      razorpaySignature
-    );
-    res.status(200).json({ success: true, data: order });
-  } catch (err) {
-    next(err);
-  }
-}
-
 export async function getMyOrders(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await orderService.getMyOrders(req.user!.id, res.locals.query as OrderQuery);

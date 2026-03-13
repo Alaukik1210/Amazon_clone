@@ -1,9 +1,6 @@
-import crypto from "crypto";
 import { Prisma, OrderStatus, PaymentMode, PaymentStatus, ProductStatus } from "@prisma/client";
 import prisma from "../../config/db";
-import razorpay from "../../config/razorpay";
 import { AppError } from "../../utils/AppError";
-import { env } from "../../config/env";
 import { sendEmail } from "../../utils/email";
 import { buildOrderConfirmationEmail } from "../../utils/emailTemplates";
 import { buildOrderInvoicePdf } from "./order.invoice";
@@ -56,22 +53,45 @@ async function finalizeOrder(
   tx: Prisma.TransactionClient,
   orderId: string,
   cartId: string,
-  items: Array<{ productId: string; quantity: number; product: { stock: number; status: ProductStatus } }>
+  items: Array<{ productId: string; quantity: number; product: { title: string } }>,
+  options: { markAsPaid: boolean }
 ) {
   for (const item of items) {
-    const newStock = item.product.stock - item.quantity;
-    await tx.product.update({
-      where: { id: item.productId },
+    // Atomic decrement prevents race conditions where concurrent checkouts oversell stock.
+    const updated = await tx.product.updateMany({
+      where: {
+        id: item.productId,
+        status: ProductStatus.ACTIVE,
+        stock: { gte: item.quantity },
+      },
       data: {
-        stock: newStock,
-        ...(newStock === 0 && { status: ProductStatus.OUT_OF_STOCK }),
+        stock: { decrement: item.quantity },
       },
     });
+
+    if (updated.count !== 1) {
+      throw new AppError(
+        `\"${item.product.title}\" is no longer available in the requested quantity`,
+        409
+      );
+    }
   }
+
+  await tx.product.updateMany({
+    where: {
+      id: { in: items.map((item) => item.productId) },
+      stock: { lte: 0 },
+    },
+    data: { status: ProductStatus.OUT_OF_STOCK },
+  });
+
   await tx.cartItem.deleteMany({ where: { cartId } });
+
   return tx.order.update({
     where: { id: orderId },
-    data: { paymentStatus: PaymentStatus.PAID },
+    data: {
+      ...(options.markAsPaid ? { paymentStatus: PaymentStatus.PAID } : {}),
+    },
     include: orderInclude,
   });
 }
@@ -109,6 +129,10 @@ export async function placeOrder(userId: string, addressId: string, paymentMode:
     new Prisma.Decimal(0)
   );
 
+  if (paymentMode === PaymentMode.RAZORPAY) {
+    throw new AppError("Online payment is temporarily unavailable. Please use Cash on Delivery.", 400);
+  }
+
   // ── COD / TEST_BYPASS: place order + deduct stock immediately ──────────────
   if (paymentMode === PaymentMode.COD || paymentMode === PaymentMode.TEST_BYPASS) {
     const order = await prisma.$transaction(async (tx) => {
@@ -131,115 +155,14 @@ export async function placeOrder(userId: string, addressId: string, paymentMode:
         include: orderInclude,
       });
 
-      return finalizeOrder(tx, newOrder.id, cart.id, cart.items);
+      return finalizeOrder(tx, newOrder.id, cart.id, cart.items, {
+        markAsPaid: paymentMode === PaymentMode.TEST_BYPASS,
+      });
     });
 
     sendConfirmationEmail(userId, order);
     return { order };
   }
-
-  // ── RAZORPAY: create Razorpay order, save to DB (stock NOT deducted yet) ──
-  // Amount must be in paise (smallest currency unit): ₹100 = 10000 paise
-  const amountInPaise = Math.round(Number(totalAmount) * 100);
-
-  const razorpayOrder = await razorpay.orders.create({
-    amount: amountInPaise,
-    currency: "INR",
-    receipt: `rcpt_${Date.now()}`,
-  });
-
-  const order = await prisma.order.create({
-    data: {
-      userId,
-      addressId,
-      totalAmount,
-      paymentMode: PaymentMode.RAZORPAY,
-      status: OrderStatus.PENDING,
-      paymentStatus: PaymentStatus.PENDING,
-      razorpayOrderId: razorpayOrder.id,
-      items: {
-        create: cart.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.product.price,
-        })),
-      },
-    },
-    include: orderInclude,
-  });
-
-  // Return Razorpay order details + keyId so frontend can open the payment modal
-  return {
-    order,
-    razorpayOrder: {
-      id: razorpayOrder.id,
-      amount: razorpayOrder.amount,
-      currency: razorpayOrder.currency,
-    },
-    keyId: env.razorpayKeyId,
-  };
-}
-
-// ── Verify Razorpay Payment ───────────────────────────────────────────────────
-
-export async function verifyPayment(
-  orderId: string,
-  userId: string,
-  razorpayOrderId: string,
-  razorpayPaymentId: string,
-  razorpaySignature: string
-) {
-  // 1. Load the order — verify ownership and that it's awaiting payment
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order || order.userId !== userId) throw new AppError("Order not found", 404);
-  if (order.paymentMode !== PaymentMode.RAZORPAY) throw new AppError("This order does not use Razorpay", 400);
-  if (order.paymentStatus === PaymentStatus.PAID) throw new AppError("Order is already paid", 400);
-  if (order.razorpayOrderId !== razorpayOrderId) throw new AppError("Razorpay order ID mismatch", 400);
-
-  // 2. Verify HMAC-SHA256 signature
-  // Razorpay signs: "<razorpay_order_id>|<razorpay_payment_id>" with KEY_SECRET
-  const expectedSignature = crypto
-    .createHmac("sha256", env.razorpayKeySecret)
-    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-    .digest("hex");
-
-  if (expectedSignature !== razorpaySignature) {
-    // Mark payment as failed so user can retry
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: PaymentStatus.FAILED },
-    });
-    throw new AppError("Payment verification failed — invalid signature", 400);
-  }
-
-  // 3. Signature valid → load cart and finalize in a transaction
-  const cart = await prisma.cart.findUnique({
-    where: { userId },
-    include: { items: { include: { product: true } } },
-  });
-
-  const paidOrder = await prisma.$transaction(async (tx) => {
-    // Update razorpayPaymentId first
-    await tx.order.update({
-      where: { id: orderId },
-      data: { razorpayPaymentId },
-    });
-
-    // Deduct stock + clear cart + mark PAID
-    if (cart && cart.items.length > 0) {
-      return finalizeOrder(tx, orderId, cart.id, cart.items);
-    }
-
-    // Cart already cleared (edge case: double verification attempt)
-    return tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: PaymentStatus.PAID },
-      include: orderInclude,
-    });
-  });
-
-  sendConfirmationEmail(userId, paidOrder);
-  return paidOrder;
 }
 
 // ── My Orders ─────────────────────────────────────────────────────────────────

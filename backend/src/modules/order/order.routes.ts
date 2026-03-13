@@ -5,7 +5,6 @@ import { authorize } from "../../middlewares/authorize";
 import { validate, validateQuery } from "../../middlewares/validate";
 import {
   placeOrderSchema,
-  verifyPaymentSchema,
   updateOrderStatusSchema,
   orderQuerySchema,
   adminOrderQuerySchema,
@@ -24,7 +23,6 @@ router.get("/", validateQuery(orderQuerySchema), orderController.getMyOrders);
 router.get("/:id/invoice", orderController.downloadOrderInvoice);
 router.get("/:id", orderController.getOrderById);
 router.patch("/:id/cancel", orderController.cancelOrder);
-router.post("/:id/verify-payment", validate(verifyPaymentSchema), orderController.verifyPayment);
 
 // Admin: update status
 router.patch("/:id/status", authorize("ADMIN"), validate(updateOrderStatusSchema), orderController.updateOrderStatus);

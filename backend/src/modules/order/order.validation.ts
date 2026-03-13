@@ -6,12 +6,6 @@ export const placeOrderSchema = z.object({
   paymentMode: z.nativeEnum(PaymentMode).default(PaymentMode.COD),
 });
 
-export const verifyPaymentSchema = z.object({
-  razorpayOrderId: z.string().min(1),
-  razorpayPaymentId: z.string().min(1),
-  razorpaySignature: z.string().min(1),
-});
-
 export const updateOrderStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
 });

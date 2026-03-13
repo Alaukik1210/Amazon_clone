@@ -49,7 +49,6 @@ router.get("/", (0, validate_1.validateQuery)(order_validation_1.orderQuerySchem
 router.get("/:id/invoice", orderController.downloadOrderInvoice);
 router.get("/:id", orderController.getOrderById);
 router.patch("/:id/cancel", orderController.cancelOrder);
-router.post("/:id/verify-payment", (0, validate_1.validate)(order_validation_1.verifyPaymentSchema), orderController.verifyPayment);
 // Admin: update status
 router.patch("/:id/status", (0, authorize_1.authorize)("ADMIN"), (0, validate_1.validate)(order_validation_1.updateOrderStatusSchema), orderController.updateOrderStatus);
 exports.default = router;

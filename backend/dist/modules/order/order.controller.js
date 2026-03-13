@@ -34,7 +34,6 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.placeOrder = placeOrder;
-exports.verifyPayment = verifyPayment;
 exports.getMyOrders = getMyOrders;
 exports.getOrderById = getOrderById;
 exports.downloadOrderInvoice = downloadOrderInvoice;
@@ -47,16 +46,6 @@ async function placeOrder(req, res, next) {
         const { addressId, paymentMode } = req.body;
         const result = await orderService.placeOrder(req.user.id, addressId, paymentMode);
         res.status(201).json({ success: true, data: result });
-    }
-    catch (err) {
-        next(err);
-    }
-}
-async function verifyPayment(req, res, next) {
-    try {
-        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-        const order = await orderService.verifyPayment(String(req.params.id), req.user.id, razorpayOrderId, razorpayPaymentId, razorpaySignature);
-        res.status(200).json({ success: true, data: order });
     }
     catch (err) {
         next(err);

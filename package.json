@@ -1,11 +1,17 @@
 {
-  "dependencies": {
-    "@tailwindcss/postcss": "^4.2.1",
-    "pdfkit": "^0.17.2",
-    "postcss": "^8.5.8",
-    "tailwindcss": "^4.2.1"
-  },
-  "devDependencies": {
-    "@types/pdfkit": "^0.17.5"
+  "name": "amazon_clone",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "lint": "npm --prefix frontend run lint",
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:build": "npm --prefix backend run build",
+    "backend:start": "npm --prefix backend run start"
   }
 }

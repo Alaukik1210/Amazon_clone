@@ -10,7 +10,7 @@
     "db:check": "ts-node --transpile-only scripts/test-db.ts",
     "db:seed": "ts-node --transpile-only scripts/seed.ts",
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --require ts-node/register/transpile-only --test \"tests/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",
@@ -30,7 +30,6 @@
     "nodemailer": "^8.0.2",
     "pdfkit": "^0.17.2",
     "pg": "^8.20.0",
-    "razorpay": "^2.9.6",
     "xss": "^1.0.15",
     "zod": "^4.3.6"
   },
@@ -44,8 +43,10 @@
     "@types/nodemailer": "^7.0.11",
     "@types/pdfkit": "^0.17.5",
     "@types/pg": "^8.18.0",
+    "@types/supertest": "^7.2.0",
     "nodemon": "^3.1.14",
     "prisma": "^7.5.0",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

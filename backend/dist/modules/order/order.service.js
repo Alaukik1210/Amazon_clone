@@ -4,19 +4,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.placeOrder = placeOrder;
-exports.verifyPayment = verifyPayment;
 exports.getMyOrders = getMyOrders;
 exports.getOrderById = getOrderById;
 exports.generateOrderInvoice = generateOrderInvoice;
 exports.cancelOrder = cancelOrder;
 exports.updateOrderStatus = updateOrderStatus;
 exports.getAllOrders = getAllOrders;
-const crypto_1 = __importDefault(require("crypto"));
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../../config/db"));
-const razorpay_1 = __importDefault(require("../../config/razorpay"));
 const AppError_1 = require("../../utils/AppError");
-const env_1 = require("../../config/env");
 const email_1 = require("../../utils/email");
 const emailTemplates_1 = require("../../utils/emailTemplates");
 const order_invoice_1 = require("./order.invoice");
@@ -59,21 +55,36 @@ async function validateCart(userId) {
     return cart;
 }
 /** Deduct stock for each item, clear the cart — runs inside a transaction. */
-async function finalizeOrder(tx, orderId, cartId, items) {
+async function finalizeOrder(tx, orderId, cartId, items, options) {
     for (const item of items) {
-        const newStock = item.product.stock - item.quantity;
-        await tx.product.update({
-            where: { id: item.productId },
+        // Atomic decrement prevents race conditions where concurrent checkouts oversell stock.
+        const updated = await tx.product.updateMany({
+            where: {
+                id: item.productId,
+                status: client_1.ProductStatus.ACTIVE,
+                stock: { gte: item.quantity },
+            },
             data: {
-                stock: newStock,
-                ...(newStock === 0 && { status: client_1.ProductStatus.OUT_OF_STOCK }),
+                stock: { decrement: item.quantity },
             },
         });
+        if (updated.count !== 1) {
+            throw new AppError_1.AppError(`\"${item.product.title}\" is no longer available in the requested quantity`, 409);
+        }
     }
+    await tx.product.updateMany({
+        where: {
+            id: { in: items.map((item) => item.productId) },
+            stock: { lte: 0 },
+        },
+        data: { status: client_1.ProductStatus.OUT_OF_STOCK },
+    });
     await tx.cartItem.deleteMany({ where: { cartId } });
     return tx.order.update({
         where: { id: orderId },
-        data: { paymentStatus: client_1.PaymentStatus.PAID },
+        data: {
+            ...(options.markAsPaid ? { paymentStatus: client_1.PaymentStatus.PAID } : {}),
+        },
         include: orderInclude,
     });
 }
@@ -104,6 +115,9 @@ async function placeOrder(userId, addressId, paymentMode) {
     const cart = await validateCart(userId);
     // 3. Calculate total
     const totalAmount = cart.items.reduce((sum, item) => sum.plus(new client_1.Prisma.Decimal(item.product.price).mul(item.quantity)), new client_1.Prisma.Decimal(0));
+    if (paymentMode === client_1.PaymentMode.RAZORPAY) {
+        throw new AppError_1.AppError("Online payment is temporarily unavailable. Please use Cash on Delivery.", 400);
+    }
     // ── COD / TEST_BYPASS: place order + deduct stock immediately ──────────────
     if (paymentMode === client_1.PaymentMode.COD || paymentMode === client_1.PaymentMode.TEST_BYPASS) {
         const order = await db_1.default.$transaction(async (tx) => {
@@ -125,99 +139,13 @@ async function placeOrder(userId, addressId, paymentMode) {
                 },
                 include: orderInclude,
             });
-            return finalizeOrder(tx, newOrder.id, cart.id, cart.items);
+            return finalizeOrder(tx, newOrder.id, cart.id, cart.items, {
+                markAsPaid: paymentMode === client_1.PaymentMode.TEST_BYPASS,
+            });
         });
         sendConfirmationEmail(userId, order);
         return { order };
     }
-    // ── RAZORPAY: create Razorpay order, save to DB (stock NOT deducted yet) ──
-    // Amount must be in paise (smallest currency unit): ₹100 = 10000 paise
-    const amountInPaise = Math.round(Number(totalAmount) * 100);
-    const razorpayOrder = await razorpay_1.default.orders.create({
-        amount: amountInPaise,
-        currency: "INR",
-        receipt: `rcpt_${Date.now()}`,
-    });
-    const order = await db_1.default.order.create({
-        data: {
-            userId,
-            addressId,
-            totalAmount,
-            paymentMode: client_1.PaymentMode.RAZORPAY,
-            status: client_1.OrderStatus.PENDING,
-            paymentStatus: client_1.PaymentStatus.PENDING,
-            razorpayOrderId: razorpayOrder.id,
-            items: {
-                create: cart.items.map((item) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    price: item.product.price,
-                })),
-            },
-        },
-        include: orderInclude,
-    });
-    // Return Razorpay order details + keyId so frontend can open the payment modal
-    return {
-        order,
-        razorpayOrder: {
-            id: razorpayOrder.id,
-            amount: razorpayOrder.amount,
-            currency: razorpayOrder.currency,
-        },
-        keyId: env_1.env.razorpayKeyId,
-    };
-}
-// ── Verify Razorpay Payment ───────────────────────────────────────────────────
-async function verifyPayment(orderId, userId, razorpayOrderId, razorpayPaymentId, razorpaySignature) {
-    // 1. Load the order — verify ownership and that it's awaiting payment
-    const order = await db_1.default.order.findUnique({ where: { id: orderId } });
-    if (!order || order.userId !== userId)
-        throw new AppError_1.AppError("Order not found", 404);
-    if (order.paymentMode !== client_1.PaymentMode.RAZORPAY)
-        throw new AppError_1.AppError("This order does not use Razorpay", 400);
-    if (order.paymentStatus === client_1.PaymentStatus.PAID)
-        throw new AppError_1.AppError("Order is already paid", 400);
-    if (order.razorpayOrderId !== razorpayOrderId)
-        throw new AppError_1.AppError("Razorpay order ID mismatch", 400);
-    // 2. Verify HMAC-SHA256 signature
-    // Razorpay signs: "<razorpay_order_id>|<razorpay_payment_id>" with KEY_SECRET
-    const expectedSignature = crypto_1.default
-        .createHmac("sha256", env_1.env.razorpayKeySecret)
-        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-        .digest("hex");
-    if (expectedSignature !== razorpaySignature) {
-        // Mark payment as failed so user can retry
-        await db_1.default.order.update({
-            where: { id: orderId },
-            data: { paymentStatus: client_1.PaymentStatus.FAILED },
-        });
-        throw new AppError_1.AppError("Payment verification failed — invalid signature", 400);
-    }
-    // 3. Signature valid → load cart and finalize in a transaction
-    const cart = await db_1.default.cart.findUnique({
-        where: { userId },
-        include: { items: { include: { product: true } } },
-    });
-    const paidOrder = await db_1.default.$transaction(async (tx) => {
-        // Update razorpayPaymentId first
-        await tx.order.update({
-            where: { id: orderId },
-            data: { razorpayPaymentId },
-        });
-        // Deduct stock + clear cart + mark PAID
-        if (cart && cart.items.length > 0) {
-            return finalizeOrder(tx, orderId, cart.id, cart.items);
-        }
-        // Cart already cleared (edge case: double verification attempt)
-        return tx.order.update({
-            where: { id: orderId },
-            data: { paymentStatus: client_1.PaymentStatus.PAID },
-            include: orderInclude,
-        });
-    });
-    sendConfirmationEmail(userId, paidOrder);
-    return paidOrder;
 }
 // ── My Orders ─────────────────────────────────────────────────────────────────
 async function getMyOrders(userId, filters) {

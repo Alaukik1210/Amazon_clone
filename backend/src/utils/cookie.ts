@@ -11,7 +11,7 @@ export function setTokenCookie(res: Response, token: string): void {
   res.cookie(TOKEN_COOKIE, token, {
     httpOnly: true,              // JS cannot read this — XSS protection
     secure: isProduction,        // HTTPS only in production
-    sameSite: isProduction ? "strict" : "lax", // CSRF protection; lax for dev (cross-port)
+    sameSite: "lax",            // Safer default across subdomains / separate frontend domains
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms (matches JWT_EXPIRES_IN)
   });
 }
@@ -21,6 +21,6 @@ export function clearTokenCookie(res: Response): void {
   res.clearCookie(TOKEN_COOKIE, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: "lax",
   });
 }

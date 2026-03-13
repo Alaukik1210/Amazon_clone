@@ -1,4 +1,4 @@
-import { connectDatabase, disconnectDatabase } from "./config/db";
+import { connectDatabase, disconnectDatabase } from "../src/config/db";
 
 async function main(): Promise<void> {
   try {

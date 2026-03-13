@@ -81,9 +81,11 @@ export async function sendOtp(data: { email: string; purpose: OtpPurpose }) {
       throw new AppError("Email already registered", 409);
     }
   } else {
-    // LOGIN — user must exist
+    // LOGIN — do not reveal whether account exists (prevents user enumeration)
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) throw new AppError("No account found with this email", 404);
+    if (!user) {
+      return;
+    }
   }
 
   // Remove any previously sent OTPs for this email + purpose
