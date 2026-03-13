@@ -65,11 +65,7 @@ The application includes authentication, product browsing, cart management, chec
 * Order placement
 * Order history
 * Order cancellation with rules
-
-## Additional
-
 * Invoice PDF download
-* Health check endpoints
 
 ---
 
@@ -194,23 +190,87 @@ Email: user@amazon-clone.com
 Password: password123
 ```
 
-# 🗄 Database Models (Overview)
+# 🗄 Database Architecture (Detailed)
 
-Main entities implemented:
+The data layer is designed around clear domain boundaries and strict relational integrity.
 
-* User
-* Address
-* Category
-* Product
-* ProductImage
-* Cart
-* CartItem
-* Wishlist
-* WishlistItem
-* Order
-* OrderItem
-* Review
-* OTPVerification
+## Domain Groups
+
+### 1) Identity and Access
+
+* `User`: account identity, role, verification state
+* `OtpVerification`: short-lived OTP records for register/login flows
+
+### 2) Catalog
+
+* `Category`: top-level product grouping (`name`, `slug` unique)
+* `Product`: sellable item with pricing, status, inventory, and denormalized rating summary
+* `ProductImage`: ordered image set per product
+
+### 3) Shopping Intent
+
+* `Cart` and `CartItem`: mutable pre-purchase basket
+* `Wishlist` and `WishlistItem`: save-for-later list
+
+### 4) Purchase and Fulfillment
+
+* `Order`: payment + fulfillment lifecycle
+* `OrderItem`: immutable line items with purchase-time price snapshot
+
+### 5) Social Feedback
+
+* `Review`: one review per user per product, source of rating aggregates
+
+## Core Relationships
+
+* `User (1) -> (N) Address`
+* `User (1) -> (1) Cart -> (N) CartItem`
+* `User (1) -> (1) Wishlist -> (N) WishlistItem`
+* `Category (1) -> (N) Product -> (N) ProductImage`
+* `User (1) -> (N) Order -> (N) OrderItem`
+* `User (1) -> (N) Review` and `Product (1) -> (N) Review`
+
+## Integrity and Constraints
+
+* Unique identity fields:
+	* `User.email`
+	* `User.phone` (nullable but unique when present)
+* Catalog uniqueness:
+	* `Category.name`, `Category.slug`
+	* `Product.sku`, `Product.slug`
+* De-duplication constraints:
+	* `CartItem @@unique([cartId, productId])`
+	* `WishlistItem @@unique([wishlistId, productId])`
+	* `Review @@unique([userId, productId])`
+* OTP performance index:
+	* `OtpVerification @@index([email, purpose])`
+
+## Delete Behavior and Data Safety
+
+* `onDelete: Cascade` is used where child records are ownership-bound:
+	* user -> addresses, cart, wishlist, reviews
+	* product -> product images, reviews
+	* order -> order items
+* This avoids orphaned records and keeps relational cleanup predictable.
+
+## Lifecycle Modeling with Enums
+
+* `Role`: `CUSTOMER`, `ADMIN`
+* `OtpPurpose`: `REGISTER`, `LOGIN`
+* `ProductStatus`: `ACTIVE`, `OUT_OF_STOCK`, `DISCONTINUED`
+* `OrderStatus`: `PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`
+* `PaymentMode`: `RAZORPAY`, `COD`, `TEST_BYPASS`
+* `PaymentStatus`: `PENDING`, `PAID`, `FAILED`, `REFUNDED`
+
+## Transactional Flows (Why This Matters)
+
+* Checkout flow uses atomic updates so stock deduction and order creation remain consistent.
+* `OrderItem.price` stores purchase-time value, preventing reporting drift when product price changes later.
+* Product rating is denormalized (`avgRating`, `reviewCount`) for fast listing reads while review integrity remains normalized.
+
+## Timestamp and Auditability
+
+Most tables include `createdAt` and `updatedAt`, allowing reliable sorting, debugging, and timeline reconstruction for operations.
 
 ---
 
@@ -246,16 +306,20 @@ This occurs due to **Render free tier cold start behavior**, where the server sp
 
 This delay is **not related to application performance or backend logic**, and once the server is active, subsequent requests respond normally.
 
+
 ---
 
-# 🧠 Implementation Highlights
+# 🧠 Engineering Decisions That Improve This Project
 
-* OTP stored **hashed with expiry** for security
-* **Atomic stock update** during checkout to prevent overselling
-* **One review per user per product constraint**
-* Secure **HttpOnly cookie authentication**
-* Authorization checks preventing access to other users' data
-* Order cancellation restores product stock
+This project intentionally focuses on real engineering practices:
+
+* Modular backend architecture
+* Feature-based frontend structure
+* React Query for server state management
+* Optimistic UI updates
+* Atomic database transactions
+* Proper error handling and validation
+* Secure API design
 
 ---
 
